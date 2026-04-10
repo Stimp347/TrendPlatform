@@ -3,49 +3,40 @@
 <head>
     <title>Дашборд анализа трендов</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
-        body { 
-            background: #f8f9fa; 
-            padding: 20px;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+        body { background: #f8f9fa; padding: 20px; }
         .stats-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border-radius: 15px;
             padding: 25px;
             margin-bottom: 25px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         .metric-box {
             background: white;
             border-radius: 10px;
             padding: 20px;
             text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .metric-box h3 {
-            margin: 0;
-            font-size: 2rem;
-            font-weight: bold;
-            color: #667eea;
-        }
-        .metric-box p {
-            margin: 0;
-            color: #6c757d;
-            font-weight: 600;
-        }
-        .table-container {
+        .metric-box h3 { margin: 0; font-size: 2rem; color: #667eea; }
+        .metric-box p { margin: 0; color: #6c757d; }
+        .chart-container {
             background: white;
             border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .table thead th {
-            background: #667eea;
-            color: white;
-            border: none;
+        .chart-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+            border-left: 4px solid #667eea;
+            padding-left: 12px;
         }
         .btn-custom {
             background: white;
@@ -53,34 +44,27 @@
             border: none;
             padding: 10px 25px;
             border-radius: 25px;
-            font-weight: 600;
             margin: 0 5px;
-            transition: all 0.3s;
             text-decoration: none;
             display: inline-block;
         }
-        .btn-custom:hover {
-            background: #f0f0f0;
-            transform: scale(1.05);
-            color: #667eea;
-        }
-        .alert-info {
-            background: linear-gradient(135deg, #f6f9fc 0%, #e6f2f9 100%);
-            border: none;
+        .table-container {
+            background: white;
             border-radius: 15px;
-            padding: 40px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        .table thead th { background: #667eea; color: white; }
+        canvas { max-height: 400px; width: 100%; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Шапка -->
         <div class="stats-card">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h1 class="display-4">📊 Платформа анализа трендов</h1>
-                    <p class="lead">Статистика из VK по собранным данным</p>
+                    <h1>📊 Платформа анализа трендов</h1>
+                    <p>Статистика из VK по собранным данным</p>
                 </div>
                 <div>
                     <a href="/" class="btn-custom">🏠 Главная</a>
@@ -91,61 +75,67 @@
         </div>
         
         {% if data and data|length > 0 %}
-        <!-- Метрики -->
+        <!-- Метрики (убрана активность) -->
         <div class="row mb-4">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="metric-box">
                     <p>Всего тем</p>
                     <h3>{{ data|length }}</h3>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="metric-box">
                     <p>Всего постов</p>
                     <h3>{{ data|sum(attribute='Посты') }}</h3>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="metric-box">
                     <p>Всего лайков</p>
                     <h3>{{ data|sum(attribute='Всего_лайков') }}</h3>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="metric-box">
-                    <p>Активность</p>
-                    <h3>
-                        {% if data|sum(attribute='Посты') > 0 %}
-                            {{ ((data|sum(attribute='Всего_лайков') / data|sum(attribute='Посты')) * 100)|round(0)|int }}%
-                        {% else %}0%{% endif %}
-                    </h3>
+        </div>
+        
+        <!-- Графики -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <div class="chart-title">📊 Количество постов по темам</div>
+                    <canvas id="postsChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <div class="chart-title">❤️ Среднее количество лайков</div>
+                    <canvas id="likesChart"></canvas>
                 </div>
             </div>
         </div>
         
-        <!-- Таблица с данными -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="chart-container">
+                    <div class="chart-title">📈 Распределение постов по темам</div>
+                    <canvas id="pieChart" style="max-height: 400px;"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Таблица -->
         <div class="table-container">
-            <h3 class="mb-4">📋 Детальная статистика по темам</h3>
+            <h3>📋 Детальная статистика</h3>
             <div class="table-responsive">
-                <table class="table table-striped table-hover">
+                <table class="table table-striped">
                     <thead>
-                        <tr>
-                            <th>Тема</th>
-                            <th>Количество постов</th>
-                            <th>Среднее лайков</th>
-                            <th>Среднее репостов</th>
-                            <th>Среднее комментариев</th>
-                            <th>Всего лайков</th>
-                        </tr>
+                        <tr><th>Тема</th><th>Посты</th><th>Лайки (сред.)</th><th>Всего лайков</th></tr>
                     </thead>
                     <tbody>
                         {% for row in data %}
                         <tr>
-                            <td><strong>{{ row.Тема }}</strong></td>
+                            <td><b>{{ row.Тема }}</b></td>
                             <td>{{ row.Посты }}</td>
-                            <td>{{ "%.1f"|format(row.Лайки) }}</td>
-                            <td>{{ "%.1f"|format(row.Репосты) }}</td>
-                            <td>{{ "%.1f"|format(row.Комментарии) }}</td>
+                            <td>{{ "%.0f"|format(row.Лайки) }}</td>
                             <td>{{ row.Всего_лайков }}</td>
                         </tr>
                         {% endfor %}
@@ -154,19 +144,124 @@
             </div>
         </div>
         
+        <script>
+            // Данные из Flask
+            const topics = [{% for row in data %}"{{ row.Тема }}",{% endfor %}];
+            const posts = [{% for row in data %}{{ row.Посты }},{% endfor %}];
+            const likes = [{% for row in data %}{{ row.Лайки }},{% endfor %}];
+            
+            // Округляем лайки для отображения (но в тултипе покажем целые)
+            const likesRounded = likes.map(l => Math.round(l));
+            
+            console.log('Темы:', topics);
+            console.log('Посты:', posts);
+            console.log('Лайки (округлённые):', likesRounded);
+            
+            // Цвета
+            const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe'];
+            
+            // 1. График постов
+            new Chart(document.getElementById('postsChart'), {
+                type: 'bar',
+                data: {
+                    labels: topics,
+                    datasets: [{
+                        label: 'Количество постов',
+                        data: posts,
+                        backgroundColor: colors,
+                        borderRadius: 10,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.raw + ' постов';
+                                }
+                            }
+                        },
+                        legend: { position: 'top' }
+                    }
+                }
+            });
+            
+            // 2. График лайков (с целыми числами при наведении)
+            new Chart(document.getElementById('likesChart'), {
+                type: 'bar',
+                data: {
+                    labels: topics,
+                    datasets: [{
+                        label: 'Среднее количество лайков',
+                        data: likes,
+                        backgroundColor: colors,
+                        borderRadius: 10,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    // Показываем целое число без остатка
+                                    return Math.round(context.raw) + ' лайков';
+                                }
+                            }
+                        },
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                callback: function(value) {
+                                    return Math.round(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 3. Круговая диаграмма
+            new Chart(document.getElementById('pieChart'), {
+                type: 'pie',
+                data: {
+                    labels: topics,
+                    datasets: [{
+                        data: posts,
+                        backgroundColor: colors,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = posts.reduce((a, b) => a + b, 0);
+                                    const percent = ((context.raw / total) * 100).toFixed(1);
+                                    return `${context.label}: ${context.raw} постов (${percent}%)`;
+                                }
+                            }
+                        },
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        </script>
+        
         {% else %}
-        <!-- Сообщение, если нет данных -->
-        <div class="alert-info text-center">
-            <h2 class="mb-4">📭 Нет данных для отображения</h2>
-            <p class="lead mb-4">Сначала соберите данные из VK, чтобы увидеть статистику</p>
-            <div class="mt-4">
-                <a href="/collect" class="btn-custom" style="background: #667eea; color: white; margin-right: 10px;">🔄 Запустить сбор данных</a>
-                <a href="/check" class="btn-custom" style="background: #6c757d; color: white;">📁 Проверить файлы</a>
-            </div>
-            <hr class="my-4" style="border-color: rgba(0,0,0,0.1);">
-            <p class="text-muted">
-                <small>Или выполните в терминале команду: <code style="background: #e9ecef; padding: 4px 8px; border-radius: 5px;">python src/vk_collector.py</code></small>
-            </p>
+        <div class="alert alert-info text-center">
+            <h2>📭 Нет данных</h2>
+            <a href="/collect" class="btn btn-primary">Собрать данные</a>
         </div>
         {% endif %}
     </div>

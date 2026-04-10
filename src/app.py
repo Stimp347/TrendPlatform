@@ -79,7 +79,7 @@ def index():
 
 @app.route('/check')
 def check_data():
-    """Проверка наличия данных (ЧЕЛОВЕКО-ЧИТАЕМАЯ)"""
+    """Проверка наличия данных (человеко-читаемая)"""
     import glob
     import os
     import pandas as pd
@@ -87,7 +87,15 @@ def check_data():
     # Находим все CSV файлы
     csv_files = glob.glob("data/*.csv")
     
-    # Формируем HTML
+    # Словарь для красивых названий
+    topic_names = {
+        'новости': '📰 Новости (ВК)',
+        'животные': '🐾 Животные (ВК)',
+        'игры': '🎮 Игры (ВК)',
+        'творчество': '🤖 Творчество (ВК)'
+
+    }
+    
     html = """
     <!DOCTYPE html>
     <html>
@@ -102,13 +110,32 @@ def check_data():
                 padding: 20px; 
                 margin: 15px 0;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                transition: transform 0.3s;
+            }
+            .file-card:hover {
+                transform: translateY(-5px);
+            }
+            .error-card {
+                background: #fff3cd;
+                border-left: 4px solid #ffc107;
+            }
+            .stats-badge {
+                background: #667eea;
+                color: white;
+                padding: 5px 10px;
+                border-radius: 20px;
+                font-size: 12px;
+                display: inline-block;
+                margin: 2px;
             }
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>📁 Проверка данных</h1>
-            <a href="/" class="btn btn-primary mb-3">← На главную</a>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>📁 Проверка собранных данных</h1>
+                <a href="/" class="btn btn-primary">← На главную</a>
+            </div>
     """
     
     if not csv_files:
@@ -120,112 +147,131 @@ def check_data():
         </div>
         """
     else:
-        html += f"<p>Найдено файлов: {len(csv_files)}</p>"
-        
+        # Группируем файлы по темам
+        files_by_topic = {}
         for file in csv_files:
             filename = os.path.basename(file)
-            df = pd.read_csv(file, encoding='utf-8-sig')
+            # Извлекаем тему из имени файла (убираем vk_ и .csv)
+            if filename.startswith('vk_'):
+                topic = filename.replace('vk_', '').replace('.csv', '')
+            else:
+                topic = filename.replace('.csv', '')
+            
+            if topic not in files_by_topic:
+                files_by_topic[topic] = []
+            files_by_topic[topic].append(file)
+        
+        html += f'<p class="text-muted mb-4">📊 Найдено тем: {len(files_by_topic)}</p>'
+        
+        # Отображаем каждую тему
+        for topic, files in files_by_topic.items():
+            # Красивое название темы
+            display_name = topic_names.get(topic, f'📌 {topic.capitalize()} (ВК)')
             
             html += f"""
             <div class="file-card">
-                <h3>📄 {filename}</h3>
-                <p><strong>Записей:</strong> {len(df)}</p>
-                <p><strong>Колонки:</strong> {', '.join(df.columns)}</p>
-                <p><strong>Пример текста:</strong><br>{df['text'].iloc[0][:200]}...</p>
-            </div>
+                <h3>{display_name}</h3>
+                <hr>
             """
+            
+            for file in files:
+                try:
+                    df = pd.read_csv(file, encoding='utf-8-sig')
+                    filename = os.path.basename(file)
+                    
+                    # Статистика по теме
+                    total_posts = len(df)
+                    avg_likes = df['likes'].mean() if 'likes' in df.columns else 0
+                    max_likes = df['likes'].max() if 'likes' in df.columns else 0
+                    total_views = df['views'].sum() if 'views' in df.columns else 0
+                    
+                    # Безопасное получение текста
+                    text_preview = ""
+                    if 'text' in df.columns and len(df) > 0:
+                        first_text = df['text'].iloc[0]
+                        if pd.notna(first_text) and str(first_text).strip():
+                            text_preview = str(first_text)[:200]
+                        else:
+                            text_preview = "(Пост без текста)"
+                    else:
+                        text_preview = "(Нет текста в данных)"
+                    
+                    html += f"""
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <span class="stats-badge">📝 Постов: {total_posts}</span>
+                                <span class="stats-badge">❤️ Средний лайк: {avg_likes:.1f}</span>
+                                <span class="stats-badge">⭐ Макс. лайк: {max_likes}</span>
+                                <span class="stats-badge">👁️ Всего просмотров: {total_views:,}</span>
+                            </div>
+                            <p><strong>📄 Пример поста:</strong></p>
+                            <div class="alert alert-secondary">
+                                <small>{text_preview}...</small>
+                            </div>
+                            <small class="text-muted">📁 Файл: {filename}</small>
+                        </div>
+                    </div>
+                    """
+                except Exception as e:
+                    html += f"""
+                    <div class="alert alert-warning">
+                        <strong>⚠️ Ошибка чтения файла:</strong> {str(e)}
+                    </div>
+                    """
+            
+            html += "</div>"
     
-    html += "</div></body></html>"
+    html += """
+        </div>
+    </body>
+    </html>
+    """
     return html
 
 @app.route('/dashboard')
 def dashboard():
     """Дашборд с визуализацией"""
     
+    import os
+    import glob
+    import pandas as pd
+    
     # Загружаем все CSV файлы
-    csv_files = glob.glob("data/*.csv")
+    csv_files = glob.glob("data/vk_*.csv")
     
-    # ЕСЛИ НЕТ ФАЙЛОВ - ПОКАЗЫВАЕМ СООБЩЕНИЕ
     if not csv_files:
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Дашборд</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        </head>
-        <body>
-            <div class="container mt-4">
-                <div class="alert alert-warning">
-                    <h2>⚠️ Нет данных для отображения</h2>
-                    <p>Сначала соберите данные:</p>
-                    <pre>python src/vk_collector.py</pre>
-                    <a href="/check" class="btn btn-primary">Проверить данные</a>
-                    <a href="/" class="btn btn-secondary">На главную</a>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
+        return render_template('dashboard.html', graphs={}, data=[])
     
-    # Собираем статистику по всем темам
+    # Собираем статистику
     data = []
     for file in csv_files:
         try:
             df = pd.read_csv(file, encoding='utf-8-sig')
-            topic = os.path.basename(file).replace('vk_', '').replace('.csv', '')
+            filename = os.path.basename(file)
+            topic = filename.replace('vk_', '').replace('.csv', '')
             
-            # Основная статистика
+            topic_names = {
+                'животные': 'Животные',
+                'игры': 'Игры',
+                'новости': 'Новости',
+                'творчество': 'Творчество'
+            }
+            display_name = topic_names.get(topic, topic)
+            
             stats = {
-                'Тема': topic,
+                'Тема': display_name,
                 'Посты': len(df),
-                'Лайки': float(df['likes'].mean()) if 'likes' in df.columns and len(df) > 0 else 0,
-                'Репосты': float(df['reposts'].mean()) if 'reposts' in df.columns and len(df) > 0 else 0,
-                'Комментарии': float(df['comments'].mean()) if 'comments' in df.columns and len(df) > 0 else 0,
-                'Всего_лайков': int(df['likes'].sum()) if 'likes' in df.columns and len(df) > 0 else 0
+                'Лайки': float(df['likes'].mean()) if 'likes' in df.columns else 0,
+                'Репосты': float(df['reposts'].mean()) if 'reposts' in df.columns else 0,
+                'Комментарии': float(df['comments'].mean()) if 'comments' in df.columns else 0,
+                'Всего_лайков': int(df['likes'].sum()) if 'likes' in df.columns else 0
             }
             data.append(stats)
         except Exception as e:
-            print(f"Ошибка чтения файла {file}: {e}")
+            print(f"Ошибка: {e}")
     
-    # СОЗДАЕМ DataFrame (даже если данные пустые)
-    if data:
-        df_stats = pd.DataFrame(data)
-    else:
-        # Создаем пустой DataFrame с правильными колонками
-        df_stats = pd.DataFrame(columns=['Тема', 'Посты', 'Лайки', 'Репосты', 'Комментарии', 'Всего_лайков'])
-    
-    # Генерируем графики
-    graphs = {}
-    
-    # 1. График количества постов (только если есть данные)
-    if not df_stats.empty and 'Посты' in df_stats.columns:
-        fig1 = px.bar(df_stats, 
-                     x='Тема', 
-                     y='Посты',
-                     title='Количество постов по темам',
-                     color='Тема')
-        graphs['posts'] = json.dumps(fig1, cls=plotly.utils.PlotlyJSONEncoder)
-        
-        # 2. График средних лайков
-        fig2 = px.bar(df_stats,
-                     x='Тема',
-                     y='Лайки',
-                     title='Среднее количество лайков',
-                     color='Тема')
-        graphs['likes'] = json.dumps(fig2, cls=plotly.utils.PlotlyJSONEncoder)
-        
-        # 3. Круговая диаграмма
-        fig3 = px.pie(df_stats,
-                     values='Посты',
-                     names='Тема',
-                     title='Распределение постов по темам')
-        graphs['pie'] = json.dumps(fig3, cls=plotly.utils.PlotlyJSONEncoder)
-    
-    # Возвращаем шаблон
-    return render_template('dashboard.html', 
-                         graphs=graphs, 
-                         data=df_stats.to_dict('records') if not df_stats.empty else [])
+    return render_template('dashboard.html', data=data)
 
 @app.route('/collect')
 def collect_data():
@@ -258,158 +304,8 @@ def collect_data():
     except Exception as e:
         return f"Ошибка: {e}"
 
-# Создаем шаблон dashboard.html если его нет
-def create_template():
-    """Создает шаблон dashboard.html если он отсутствует"""
-    template_dir = 'templates'
-    template_file = os.path.join(template_dir, 'dashboard.html')
-    
-    if not os.path.exists(template_dir):
-        os.makedirs(template_dir)
-    
-    if not os.path.exists(template_file):
-        with open(template_file, 'w', encoding='utf-8') as f:
-            f.write('''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Дашборд</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #f8f9fa; padding: 20px; }
-        .chart-container {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .stats-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="stats-card">
-            <h1>📊 Дашборд анализа трендов</h1>
-            <p>Данные из VK по различным темам</p>
-            <a href="/" class="btn btn-light btn-sm">На главную</a>
-            <a href="/check" class="btn btn-light btn-sm">Проверить данные</a>
-        </div>
-        
-        {% if data %}
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="chart-container">
-                    <h5>Всего тем</h5>
-                    <h2>{{ data|length }}</h2>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="chart-container">
-                    <h5>Всего постов</h5>
-                    <h2>{{ data|sum(attribute='Посты') }}</h2>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="chart-container">
-                    <h5>Всего лайков</h5>
-                    <h2>{{ data|sum(attribute='Всего_лайков') }}</h2>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="chart-container">
-                    <h5>Средний лайков</h5>
-                    <h2>{% if data|sum(attribute='Посты') > 0 %}
-                        {{ (data|sum(attribute='Всего_лайков') / data|sum(attribute='Посты'))|round(1) }}
-                    {% else %}0{% endif %}</h2>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <div class="chart-container">
-                    <div id="chart-posts"></div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="chart-container">
-                    <div id="chart-likes"></div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <div class="chart-container">
-                    <div id="chart-pie"></div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="chart-container">
-                    <h5>Детальная статистика</h5>
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Тема</th>
-                                <th>Посты</th>
-                                <th>Лайки (сред.)</th>
-                                <th>Репосты (сред.)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for row in data %}
-                            <tr>
-                                <td><b>{{ row.Тема }}</b></td>
-                                <td>{{ row.Посты }}</td>
-                                <td>{{ "%.1f"|format(row.Лайки) }}</td>
-                                <td>{{ "%.1f"|format(row.Репосты) }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        
-        <script>
-            {% if graphs.posts %}
-            var postsGraph = {{ graphs.posts | safe }};
-            Plotly.newPlot('chart-posts', postsGraph.data, postsGraph.layout);
-            {% endif %}
-            
-            {% if graphs.likes %}
-            var likesGraph = {{ graphs.likes | safe }};
-            Plotly.newPlot('chart-likes', likesGraph.data, likesGraph.layout);
-            {% endif %}
-            
-            {% if graphs.pie %}
-            var pieGraph = {{ graphs.pie | safe }};
-            Plotly.newPlot('chart-pie', pieGraph.data, pieGraph.layout);
-            {% endif %}
-        </script>
-        {% else %}
-        <div class="alert alert-info">
-            <h4>ℹ️ Нет данных для отображения</h4>
-            <p>Соберите данные через <a href="/collect">сборщик</a> или проверьте <a href="/check">наличие файлов</a>.</p>
-        </div>
-        {% endif %}
-    </div>
-</body>
-</html>
-            ''')
-    return template_file
 
 if __name__ == '__main__':
-    # Создаем шаблон при запуске
-    create_template()
     
     print("=" * 50)
     print("🚀 ПЛАТФОРМА АНАЛИЗА ТРЕНДОВ ЗАПУЩЕНА")

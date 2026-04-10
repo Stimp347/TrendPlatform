@@ -10,5 +10,15 @@
     "editor.wordWrap": "on",
     "[python]": {
         "editor.defaultFormatter": "ms-python.python"
-    }
+    },
+    
+    "files.associations": {
+        "*.html": "jinja-html"
+    },
+    "emmet.includeLanguages": {
+        "jinja-html": "html"
+    },
+    "jinja-traceur.sandbox": false
+
+    
 }

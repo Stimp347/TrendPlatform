@@ -1,7 +1,8 @@
 import vk_api
 import pandas as pd
 from datetime import datetime
-import json
+import time
+import os
 
 class VKDataCollector:
     def __init__(self, access_token):
@@ -11,107 +12,151 @@ class VKDataCollector:
         self.vk = self.vk_session.get_api()
         print("✓ Успешно подключено к VK API")
     
-    def collect_posts(self, query, count=100):
-        """Сбор постов по запросу"""
-        print(f"Сбор данных по запросу: '{query}'")
-        
+    def get_posts_from_community(self, owner_id, count=50):
+        """Получение постов из конкретного сообщества по ID"""
         try:
-            response = self.vk.newsfeed.search(
-                q=query,
-                count=min(count, 200),
-                extended=1,
-                fields='id,first_name,last_name'
+            response = self.vk.wall.get(
+                owner_id=owner_id,
+                count=min(count, 100),
+                filter='owner'
             )
             
-            posts_data = []
+            posts = []
+            for item in response.get('items', []):
+                if item.get('text'):
+                    posts.append({
+                        'id': f"{owner_id}_{item['id']}",
+                        'text': item.get('text', '')[:500],
+                        'date': datetime.fromtimestamp(item['date']).strftime('%Y-%m-%d %H:%M:%S'),
+                        'likes': item.get('likes', {}).get('count', 0),
+                        'reposts': item.get('reposts', {}).get('count', 0),
+                        'comments': item.get('comments', {}).get('count', 0),
+                        'views': item.get('views', {}).get('count', 0),
+                        'url': f"https://vk.com/wall{owner_id}_{item['id']}"
+                    })
             
-            for i, item in enumerate(response.get('items', [])):
-                # Прогресс
-                if i % 10 == 0:
-                    print(f"  Обработано {i+1}/{len(response['items'])} постов")
-                
-                post_info = {
-                    'id': f"{item['owner_id']}_{item['id']}",
-                    'text': item.get('text', '')[:500],
-                    'date': datetime.fromtimestamp(item['date']).strftime('%Y-%m-%d %H:%M:%S'),
-                    'likes': item.get('likes', {}).get('count', 0),
-                    'reposts': item.get('reposts', {}).get('count', 0),
-                    'comments': item.get('comments', {}).get('count', 0),
-                    'views': item.get('views', {}).get('count', 0)
-                }
-                
-                # Ищем автора
-                author = "Неизвестно"
-                for profile in response.get('profiles', []):
-                    if profile['id'] == abs(item['owner_id']):
-                        author = f"{profile['first_name']} {profile['last_name']}"
-                        break
-                
-                post_info['author'] = author
-                posts_data.append(post_info)
-            
-            df = pd.DataFrame(posts_data)
-            print(f"✓ Собрано {len(df)} постов")
-            return df
+            return posts
             
         except Exception as e:
-            print(f"✗ Ошибка: {e}")
+            print(f"    Ошибка получения постов: {e}")
+            return []
+    
+    def collect_posts_by_topic(self, topic, posts_per_topic=50):
+        """Сбор постов по теме из популярных сообществ"""
+        print(f"\n📊 Сбор данных по теме: '{topic.upper()}'")
+        print("-" * 50)
+        
+        # ID популярных сообществ по новым темам
+        communities_by_topic = {
+            "новости": [
+                -15755094,   # РИА Новости
+                -179925889,   # Мировые новости
+                -149802835,    # Новости России
+                -58053864,   # ГОрячие новости
+                -40316705,   # Новости RT
+            ],
+            "животные": [
+                -196446229,   # Животные Котики
+                -199741490,   # Веселые животные
+                -44042424,   # Москва - провавшие животные
+                -196446214, # Смешные животные
+                -199794190,  # Удивительные животные
+            ],
+            "игры": [
+                -387766,   # Игромания
+                -78616012,  # Игры ВК
+                -79637473,    # Новости Кс
+                -67281773,   # Dota 2
+                -148506755,   # Хатаб
+            ],
+            "творчество": [
+                -95898540,  # Творчество с детьми
+                -220736078,  # Полка чудес
+                -102945113,  # Детское творчество
+                -220751482,  # Самоделкин
+                -211522250,  # Дом твор Передел
+            ]
+        }
+        
+        community_ids = communities_by_topic.get(topic, [])
+        
+        if not community_ids:
+            print(f"  ✗ Нет сообществ для темы '{topic}'")
             return pd.DataFrame()
+        
+        all_posts = []
+        posts_per_community = max(10, posts_per_topic // len(community_ids))
+        
+        for community_id in community_ids:
+            if len(all_posts) >= posts_per_topic:
+                break
+                
+            print(f"  Парсинг сообщества ID: {community_id}")
+            posts = self.get_posts_from_community(community_id, posts_per_community)
+            
+            for post in posts:
+                post['topic'] = topic
+                all_posts.append(post)
+            
+            print(f"    Получено постов: {len(posts)}")
+            time.sleep(0.34)
+        
+        if all_posts:
+            print(f"\n  ✓ Итого по теме '{topic}': {len(all_posts)} постов")
+            print(f"  ✓ Средний лайк: {sum(p['likes'] for p in all_posts) / len(all_posts):.1f}")
+            print(f"  ✓ Максимум лайков: {max(p['likes'] for p in all_posts)}")
+        
+        return pd.DataFrame(all_posts)
+    
+    def save_to_csv(self, df, topic, data_dir='data'):
+        """Сохранение данных в CSV"""
+        os.makedirs(data_dir, exist_ok=True)
+        filename = os.path.join(data_dir, f"vk_{topic}.csv")
+        df.to_csv(filename, index=False, encoding='utf-8-sig')
+        print(f"  ✓ Данные сохранены в {filename}")
+        return filename
 
-# Тестовая функция
-def test_collector():
-    """Тестирование коллектора"""
-    print("=" * 50)
-    print("ТЕСТ СБОРЩИКА ДАННЫХ VK")
-    print("=" * 50)
+def collect_all_topics():
+    """Сбор данных по всем темам"""
+    print("=" * 60)
+    print("🚀 СБОР ДАННЫХ ИЗ ПОПУЛЯРНЫХ СООБЩЕСТВ VK")
+    print("=" * 60)
+    print("Темы: НОВОСТИ, ЖИВОТНЫЕ, ИГРЫ, ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ")
+    print("=" * 60)
     
-    # ВАШ ТОКЕН (замените на реальный)
-    ACCESS_TOKEN = "dc7d4a92dc7d4a92dc7d4a921ddf4255aeddc7ddc7d4a92b5d8c9e69bf9e9d6dfc1c5a6"
+    # ВАШ СЕРВИСНЫЙ ТОКЕН
+    ACCESS_TOKEN = "503afe10503afe10503afe107c5305e12c5503a503afe1039e202efc30d18b798cccd7b"
     
-    if ACCESS_TOKEN == "ваш_токен_здесь":
-        print("\n⚠️  ВНИМАНИЕ: Замените ACCESS_TOKEN на реальный токен VK!")
-        print("Как получить токен:")
-        print("1. Откройте https://vk.com/dev")
-        print("2. Создайте Standalone приложение")
-        print("3. Получите токен через OAuth")
+    if len(ACCESS_TOKEN) < 50:
+        print("\n⚠️ Некорректный токен!")
+        print("Вставьте ваш сервисный токен из настроек VK приложения")
         return
     
     collector = VKDataCollector(ACCESS_TOKEN)
     
-    # Тестовые запросы
-    test_queries = ["кофе", "чай"]
+    # НОВЫЕ ТЕМЫ (кофе и чай заменены на новости и животные)
+    topics = ["новости", "животные", "игры", "творчество"]
     
-    for query in test_queries:
-        print(f"\n{'='*30}")
-        print(f"Сбор данных: {query}")
-        print('='*30)
-        
-        df = collector.collect_posts(query, count=30)
+    for topic in topics:
+        print(f"\n{'='*50}")
+        df = collector.collect_posts_by_topic(topic, posts_per_topic=50)
         
         if not df.empty:
-            # Сохраняем в CSV
-            filename = f"C:\\Users\\User\\trend_platform\\data\\vk_{query}.csv"
-            df.to_csv(filename, index=False, encoding='utf-8-sig')
-            print(f"✓ Данные сохранены в {filename}")
-            
-            # Показываем статистику
-            print(f"\nСтатистика по '{query}':")
-            print(f"  Всего постов: {len(df)}")
-            print(f"  Среднее лайков: {df['likes'].mean():.1f}")
-            print(f"  Среднее репостов: {df['reposts'].mean():.1f}")
-            print(f"  Самый популярный пост: {df['likes'].max()} лайков")
-            
-            # Пример поста
-            if len(df) > 0:
-                print(f"\nПример поста:")
-                print(f"  Текст: {df.iloc[0]['text'][:100]}...")
-                print(f"  Автор: {df.iloc[0]['author']}")
-                print(f"  Дата: {df.iloc[0]['date']}")
+            collector.save_to_csv(df, topic)
         else:
-            print(f"✗ Не удалось собрать данные по запросу '{query}'")
+            print(f"  ✗ Не удалось собрать данные по теме '{topic}'")
+        
+        time.sleep(1)
     
-    print("\n" + "="*50)
-    print("ТЕСТ ЗАВЕРШЕН")
+    print("\n" + "=" * 60)
+    print("✨ СБОР ДАННЫХ ЗАВЕРШЕН")
+    print("=" * 60)
+    print("\n📁 Файлы сохранены в папке 'data':")
+    print("   - vk_новости.csv")
+    print("   - vk_животные.csv")
+    print("   - vk_игры.csv")
+    print("   - vk_творчество.csv")
+    print("\n💡 Запустите дашборд: python src/app.py")
 
 if __name__ == "__main__":
-    test_collector()
+    collect_all_topics()
