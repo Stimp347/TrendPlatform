@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Прогноз упоминаний на 7 дней</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        body { background: #f8f9fa; padding: 20px; }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        .forecast-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .prediction-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .trend-up { color: #28a745; }
+        .trend-down { color: #dc3545; }
+        .accuracy-high { background: #d4edda; color: #155724; border-radius: 20px; padding: 5px 15px; }
+        .accuracy-medium { background: #fff3cd; color: #856404; border-radius: 20px; padding: 5px 15px; }
+        .accuracy-low { background: #f8d7da; color: #721c24; border-radius: 20px; padding: 5px 15px; }
+        .btn-custom {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            margin: 0 5px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        canvas { max-height: 300px; width: 100%; }
+        .daily-badge {
+            display: inline-block;
+            width: 50px;
+            text-align: center;
+            background: #f0f0f0;
+            border-radius: 10px;
+            padding: 8px;
+            margin: 5px;
+        }
+        .daily-number {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1>🔮 Прогноз упоминаний на 7 дней</h1>
+                    <p>ML прогноз частоты упоминаний в социальных сетях</p>
+                </div>
+                <div>
+                    <a href="/" class="btn-custom">🏠 Главная</a>
+                    <a href="/dashboard" class="btn-custom">📊 Дашборд</a>
+                    <a href="/check" class="btn-custom">📁 Данные</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            {% for topic, result in predictions.items() %}
+            <div class="col-md-6">
+                <div class="forecast-card">
+                    <h3>{{ topic }}</h3>
+                    
+                    {% if result.error %}
+                        <div class="alert alert-warning mt-3">
+                            <strong>⚠️ {{ result.error }}</strong>
+                            {% if result.need_more %}
+                                <p class="mb-0 mt-2">Нужно собрать данные за ещё {{ result.need_more }} дней</p>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <!-- Основные метрики -->
+                        <div class="row mt-3 text-center">
+                            <div class="col-4">
+                                <small class="text-muted">Прогноз на неделю</small>
+                                <div class="prediction-number">{{ result.total_prediction }}</div>
+                                <small>упоминаний</small>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted">В среднем в день</small>
+                                <div class="prediction-number">{{ result.avg_prediction }}</div>
+                                <small>упоминаний</small>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted">Историческое среднее</small>
+                                <div class="prediction-number">{{ result.avg_historical }}</div>
+                                <small>в день</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Прогноз по дням -->
+                        <div class="mt-3 text-center">
+                            <small class="text-muted">Прогноз на каждый день:</small>
+                            <div class="mt-2">
+                                {% for i in range(7) %}
+                                <div class="daily-badge">
+                                    <div><small>{{ result.dates[i] }}</small></div>
+                                    <div class="daily-number">{{ result.predictions[i] }}</div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <!-- Тренд и точность -->
+                        <div class="row mt-3">
+                            <div class="col-6">
+                                <span class="{{ 'accuracy-high' if result.accuracy > 70 else 'accuracy-medium' if result.accuracy > 50 else 'accuracy-low' }}">
+                                    🎯 Точность: {{ result.accuracy }}%
+                                </span>
+                            </div>
+                            <div class="col-6 text-end">
+                                <span class="badge bg-secondary {{ 'trend-up' if 'Растёт' in result.trend else 'trend-down' if 'Падает' in result.trend else '' }}">
+                                    {{ result.trend }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- График -->
+                        <canvas id="chart-{{ loop.index }}" class="mt-3"></canvas>
+                        
+                        <div class="text-muted small mt-3">
+                            * Прогноз основан на Random Forest (ансамбль из 50 деревьев)<br>
+                            * Модель анализирует паттерны упоминаний за последние дни
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- JavaScript для графика -->
+            {% if not result.error %}
+            <script>
+                (function() {
+                    const ctx = document.getElementById('chart-{{ loop.index }}').getContext('2d');
+                    const dates = {{ result.dates|tojson }};
+                    const predictions = {{ result.predictions|tojson }};
+                    
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: dates,
+                            datasets: [{
+                                label: 'Прогноз упоминаний',
+                                data: predictions,
+                                borderColor: '#667eea',
+                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: '#667eea',
+                                pointRadius: 5,
+                                pointHoverRadius: 7
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.raw + ' упоминаний';
+                                        }
+                                    }
+                                },
+                                legend: { position: 'top' }
+                            },
+                            scales: {
+                                y: {
+                                    title: { display: true, text: 'Количество упоминаний' },
+                                    ticks: { stepSize: 1, precision: 0 }
+                                },
+                                x: { title: { display: true, text: 'Дата' } }
+                            }
+                        }
+                    });
+                })();
+            </script>
+            {% endif %}
+            {% endfor %}
+        </div>
+        
+        <div class="alert alert-info mt-4">
+            <h5>🤖 Как работает прогноз упоминаний?</h5>
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <strong>1. Анализ временного ряда</strong>
+                    <p class="small">Подсчёт количества постов по дням = частота упоминаний</p>
+                </div>
+                <div class="col-md-4">
+                    <strong>2. Скользящее окно (7 дней)</strong>
+                    <p class="small">Модель учится на последних 7 днях, предсказывает следующий</p>
+                </div>
+                <div class="col-md-4">
+                    <strong>3. Итеративный прогноз</strong>
+                    <p class="small">Предсказание используется для следующего дня (прогноз на 7 дней)</p>
+                </div>
+            </div>
+            <hr>
+            <p class="small text-muted mb-0">
+                📊 Прогноз показывает, сколько постов (упоминаний) ожидается в ближайшую неделю.<br>
+                🔄 Чем больше исторических данных, тем точнее прогноз!
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,4 +1,5 @@
 from flask import Flask, render_template, jsonify
+from forecast_ml import MLForecast
 import pandas as pd
 import plotly
 import plotly.express as px
@@ -42,17 +43,17 @@ def index():
             </div>
             
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card">
                         <div class="card-body text-center">
                             <h5 class="card-title">📈 Дашборд</h5>
-                            <p>Интерактивная визуализация данных</p>
+                            <p>Интерактивная визуализация</p>
                             <a href="/dashboard" class="btn btn-primary">Открыть</a>
                         </div>
                     </div>
                 </div>
                 
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card">
                         <div class="card-body text-center">
                             <h5 class="card-title">📁 Проверка данных</h5>
@@ -62,7 +63,7 @@ def index():
                     </div>
                 </div>
                 
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card">
                         <div class="card-body text-center">
                             <h5 class="card-title">🔄 Сбор данных</h5>
@@ -71,6 +72,18 @@ def index():
                         </div>
                     </div>
                 </div>
+                
+                <!-- НОВАЯ КАРТОЧКА ДЛЯ ПРОГНОЗОВ -->
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">🔮 ML Прогнозы</h5>
+                            <p>Предсказание популярности</p>
+                            <a href="/forecast" class="btn btn-info">Открыть</a>
+                        </div>
+                    </div>
+                </div>
+                <!-- КОНЕЦ НОВОЙ КАРТОЧКИ -->
             </div>
         </div>
     </body>
@@ -228,6 +241,14 @@ def check_data():
     </html>
     """
     return html
+
+@app.route('/forecast')
+def forecast_page():
+    """Страница с ML прогнозами"""
+    forecast = MLForecast()
+    predictions = forecast.forecast_all_topics()
+    
+    return render_template('forecast.html', predictions=predictions)
 
 @app.route('/dashboard')
 def dashboard():
