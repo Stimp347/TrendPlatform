@@ -163,7 +163,7 @@ class MLForecast:
             display_name = topic_names.get(topic, topic)
             
             print(f"\n📊 Обработка: {display_name}")
-            df = pd.read_csv(file, encoding='utf-8-sig')
+            df = pd.read_csv(file, encoding='utf-8-sig', sep=';')
             daily_mentions = self.prepare_time_series(df)
             
             print(f"   Дней в данных: {len(daily_mentions)}")

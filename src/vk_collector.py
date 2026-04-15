@@ -1,8 +1,9 @@
 import vk_api
 import pandas as pd
 from datetime import datetime
-import time
+import json
 import os
+import time
 
 class VKDataCollector:
     def __init__(self, access_token):
@@ -10,7 +11,7 @@ class VKDataCollector:
         print("Инициализация VK коллектора...")
         self.vk_session = vk_api.VkApi(token=access_token)
         self.vk = self.vk_session.get_api()
-        print("✓ Успешно подключено к VK API")
+        print("[OK] Успешно подключено к VK API")
     
     def get_posts_from_community(self, owner_id, count=50):
         """Получение постов из конкретного сообщества по ID"""
@@ -43,7 +44,7 @@ class VKDataCollector:
     
     def collect_posts_by_topic(self, topic, posts_per_topic=50):
         """Сбор постов по теме из популярных сообществ"""
-        print(f"\n📊 Сбор данных по теме: '{topic.upper()}'")
+        print(f"\nСбор данных по теме: '{topic.upper()}'")
         print("-" * 50)
         
         # ID популярных сообществ по новым темам
@@ -81,7 +82,7 @@ class VKDataCollector:
         community_ids = communities_by_topic.get(topic, [])
         
         if not community_ids:
-            print(f"  ✗ Нет сообществ для темы '{topic}'")
+            print(f"  Нет сообществ для темы '{topic}'")
             return pd.DataFrame()
         
         all_posts = []
@@ -102,9 +103,10 @@ class VKDataCollector:
             time.sleep(0.34)
         
         if all_posts:
-            print(f"\n  ✓ Итого по теме '{topic}': {len(all_posts)} постов")
-            print(f"  ✓ Средний лайк: {sum(p['likes'] for p in all_posts) / len(all_posts):.1f}")
-            print(f"  ✓ Максимум лайков: {max(p['likes'] for p in all_posts)}")
+            print(f"\n  Итого по теме '{topic}': {len(all_posts)} постов")
+            avg_likes = sum(p['likes'] for p in all_posts) / len(all_posts) if all_posts else 0
+            print(f"  Средний лайк: {avg_likes:.1f}")
+            print(f"  Максимум лайков: {max(p['likes'] for p in all_posts)}")
         
         return pd.DataFrame(all_posts)
     
@@ -112,30 +114,27 @@ class VKDataCollector:
         """Сохранение данных в CSV"""
         os.makedirs(data_dir, exist_ok=True)
         filename = os.path.join(data_dir, f"vk_{topic}.csv")
-        df.to_csv(filename, index=False, encoding='utf-8-sig')
-        print(f"  ✓ Данные сохранены в {filename}")
+        df.to_csv(filename, index=False, encoding='utf-8-sig', sep=';')
+        print(f"  Данные сохранены в {filename}")
         return filename
 
 def collect_all_topics():
     """Сбор данных по всем темам"""
     print("=" * 60)
-    print("🚀 СБОР ДАННЫХ ИЗ ПОПУЛЯРНЫХ СООБЩЕСТВ VK")
-    print("=" * 60)
-    print("Темы: НОВОСТИ, ЖИВОТНЫЕ, ИГРЫ, ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ")
+    print("СБОР ДАННЫХ ИЗ ПОПУЛЯРНЫХ СООБЩЕСТВ VK")
     print("=" * 60)
     
     # ВАШ СЕРВИСНЫЙ ТОКЕН
-    ACCESS_TOKEN = "503afe10503afe10503afe107c5305e12c5503a503afe1039e202efc30d18b798cccd7b"
+    ACCESS_TOKEN = "daf3d228daf3d228daf3d228b5d9cccd14ddaf3daf3d228b32fd1efd2e79cf2c93639a0"
     
     if len(ACCESS_TOKEN) < 50:
-        print("\n⚠️ Некорректный токен!")
+        print("\n[WARNING] Некорректный токен!")
         print("Вставьте ваш сервисный токен из настроек VK приложения")
         return
     
     collector = VKDataCollector(ACCESS_TOKEN)
     
-    # НОВЫЕ ТЕМЫ (кофе и чай заменены на новости и животные)
-    topics = ["новости", "животные", "игры", "творчество"]
+    topics = ["животные", "игры", "новости", "творчество"]
     
     for topic in topics:
         print(f"\n{'='*50}")
@@ -144,19 +143,16 @@ def collect_all_topics():
         if not df.empty:
             collector.save_to_csv(df, topic)
         else:
-            print(f"  ✗ Не удалось собрать данные по теме '{topic}'")
+            print(f"  Не удалось собрать данные по теме '{topic}'")
         
         time.sleep(1)
     
     print("\n" + "=" * 60)
-    print("✨ СБОР ДАННЫХ ЗАВЕРШЕН")
+    print("СБОР ДАННЫХ ЗАВЕРШЕН")
     print("=" * 60)
-    print("\n📁 Файлы сохранены в папке 'data':")
-    print("   - vk_новости.csv")
-    print("   - vk_животные.csv")
-    print("   - vk_игры.csv")
-    print("   - vk_творчество.csv")
-    print("\n💡 Запустите дашборд: python src/app.py")
+    print("\nФайлы сохранены в папке 'data':")
+    for topic in topics:
+        print(f"   - vk_{topic}.csv")
 
 if __name__ == "__main__":
     collect_all_topics()

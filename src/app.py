@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from forecast_ml import MLForecast
 import pandas as pd
 import plotly
@@ -189,7 +189,7 @@ def check_data():
             
             for file in files:
                 try:
-                    df = pd.read_csv(file, encoding='utf-8-sig')
+                    df = pd.read_csv(file, encoding='utf-8-sig', sep=';')
                     filename = os.path.basename(file)
                     
                     # Статистика по теме
@@ -268,7 +268,7 @@ def dashboard():
     data = []
     for file in csv_files:
         try:
-            df = pd.read_csv(file, encoding='utf-8-sig')
+            df = pd.read_csv(file, encoding='utf-8-sig', sep=';')
             filename = os.path.basename(file)
             topic = filename.replace('vk_', '').replace('.csv', '')
             
@@ -294,36 +294,43 @@ def dashboard():
     
     return render_template('dashboard.html', data=data)
 
-@app.route('/collect')
+@app.route('/collect', methods=['GET', 'POST'])
 def collect_data():
-    """Запуск сбора данных (упрощенная версия)"""
-    import subprocess
-    import sys
+    """Страница сбора данных с формой"""
     
-    try:
-        # Запускаем сборщик данных
-        result = subprocess.run([sys.executable, 'src/vk_collector.py'], 
-                               capture_output=True, text=True)
+    if request.method == 'POST':
+        import subprocess
+        import sys
+        import os
         
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Сбор данных</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        </head>
-        <body>
-            <div class="container mt-4">
-                <h1>Результат сбора данных</h1>
-                <pre>{result.stdout}</pre>
-                <a href="/check" class="btn btn-primary">Проверить данные</a>
-                <a href="/" class="btn btn-secondary">На главную</a>
-            </div>
-        </body>
-        </html>
-        """
-    except Exception as e:
-        return f"Ошибка: {e}"
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            collector_path = os.path.join(base_dir, 'src', 'vk_collector.py')
+            
+            result = subprocess.run(
+                [sys.executable, collector_path],
+                capture_output=True,
+                text=True,
+                timeout=180
+            )
+            
+            if result.returncode == 0:
+                # Успех - не показываем лог, просто красивую страницу
+                return render_template('collect_result.html', success=True)
+            else:
+                return render_template('collect_result.html',
+                                     success=False,
+                                     error=result.stderr if result.stderr else "Неизвестная ошибка")
+        except subprocess.TimeoutExpired:
+            return render_template('collect_result.html',
+                                 success=False,
+                                 error="Превышено время ожидания (3 минуты)")
+        except Exception as e:
+            return render_template('collect_result.html',
+                                 success=False,
+                                 error=str(e))
+    
+    return render_template('collect_form.html')
 
 
 if __name__ == '__main__':

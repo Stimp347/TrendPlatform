@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Сбор данных VK</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f8f9fa; padding: 20px; }
+        .header-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        .form-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .topic-badge {
+            display: inline-block;
+            background: #e9ecef;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin: 5px;
+        }
+        .btn-custom {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            margin: 0 5px;
+            text-decoration: none;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Шапка -->
+        <div class="header-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1>🔄 Сбор данных из VK</h1>
+                    <p class="lead">Автоматический парсинг постов по темам</p>
+                </div>
+                <div>
+                    <a href="/" class="btn-custom">🏠 Главная</a>
+                    <a href="/dashboard" class="btn-custom">📊 Дашборд</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-card">
+            <h3>📋 Что будет собрано?</h3>
+            <div class="row mt-3">
+                <div class="col-md-3">
+                    <div class="topic-badge">🐾 Животные</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="topic-badge">🎮 Игры</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="topic-badge">📰 Новости</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="topic-badge">🎨 Творчество</div>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>📊 Какие данные собираются:</h5>
+                    <ul>
+                        <li>Текст поста</li>
+                        <li>Количество лайков</li>
+                        <li>Количество репостов</li>
+                        <li>Количество комментариев</li>
+                        <li>Дата публикации</li>
+                        <li>Автор поста</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h5>⏱️ Информация о процессе:</h5>
+                    <ul>
+                        <li>По 50 постов на каждую тему</li>
+                        <li>Всего ~200 постов</li>
+                        <li>Время сбора: ~1-2 минуты</li>
+                        <li>Данные сохраняются в папку data/</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <form method="POST">
+                <div class="alert alert-info">
+                    <strong>💡 Внимание:</strong> При нажатии кнопки начнётся сбор данных. 
+                    Пожалуйста, не закрывайте страницу до завершения процесса.
+                </div>
+                
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        🚀 Начать сбор данных
+                    </button>
+                    <a href="/" class="btn btn-secondary btn-lg">Отмена</a>
+                </div>
+            </form>
+        </div>
+        
+        <div class="alert alert-warning mt-4">
+            <strong>⚠️ Примечание:</strong>
+            <ul class="mb-0 mt-2">
+                <li>Сбор может занять некоторое время в зависимости от скорости интернета</li>
+                <li>Новые данные перезапишут старые файлы</li>
+                <li>После завершения вы будете перенаправлены на страницу с результатами</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
