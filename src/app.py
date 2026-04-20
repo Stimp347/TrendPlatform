@@ -12,292 +12,353 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     """Главная страница"""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Анализ трендов</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            body { padding: 20px; background: #f5f5f5; }
-            .header { 
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                color: white; 
-                padding: 2rem; 
-                border-radius: 10px; 
-                margin-bottom: 2rem; 
-            }
-            .card { 
-                margin: 10px; 
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
-                transition: transform 0.3s; 
-            }
-            .card:hover { transform: translateY(-5px); }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>📊 Платформа анализа трендов</h1>
-                <p class="lead">Анализ социальных медиа на Python + Flask</p>
-            </div>
-            
-            <div class="row">
-                <div class="col-md-3">
-                    <div class="card">
-                        <div class="card-body text-center">
-                            <h5 class="card-title">📈 Дашборд</h5>
-                            <p>Интерактивная визуализация</p>
-                            <a href="/dashboard" class="btn btn-primary">Открыть</a>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-3">
-                    <div class="card">
-                        <div class="card-body text-center">
-                            <h5 class="card-title">📁 Проверка данных</h5>
-                            <p>Посмотреть собранные файлы</p>
-                            <a href="/check" class="btn btn-success">Проверить</a>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-3">
-                    <div class="card">
-                        <div class="card-body text-center">
-                            <h5 class="card-title">🔄 Сбор данных</h5>
-                            <p>Запустить сборщик VK</p>
-                            <a href="/collect" class="btn btn-warning">Собрать</a>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- НОВАЯ КАРТОЧКА ДЛЯ ПРОГНОЗОВ -->
-                <div class="col-md-3">
-                    <div class="card">
-                        <div class="card-body text-center">
-                            <h5 class="card-title">🔮 ML Прогнозы</h5>
-                            <p>Предсказание популярности</p>
-                            <a href="/forecast" class="btn btn-info">Открыть</a>
-                        </div>
-                    </div>
-                </div>
-                <!-- КОНЕЦ НОВОЙ КАРТОЧКИ -->
-            </div>
-        </div>
-    </body>
-    </html>
-    """
+    return render_template('index.html')
 
 @app.route('/check')
 def check_data():
-    """Проверка наличия данных (человеко-читаемая)"""
+    """Проверка наличия данных"""
+    import pandas as pd
     import glob
     import os
-    import pandas as pd
     
-    # Находим все CSV файлы
-    csv_files = glob.glob("data/*.csv")
+    # VK данные
+    vk_files = []
+    vk_csv_files = glob.glob("data/vk_*.csv")
     
-    # Словарь для красивых названий
-    topic_names = {
-        'новости': '📰 Новости (ВК)',
-        'животные': '🐾 Животные (ВК)',
-        'игры': '🎮 Игры (ВК)',
-        'творчество': '🤖 Творчество (ВК)'
-
+    topic_names_vk = {
+        'животные': '🐾 Животные',
+        'игры': '🎮 Игры',
+        'новости': '📰 Новости',
+        'творчество': '🎨 Творчество'
     }
     
-    html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Проверка данных</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            body { background: #f5f5f5; padding: 20px; }
-            .file-card { 
-                background: white; 
-                border-radius: 10px; 
-                padding: 20px; 
-                margin: 15px 0;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                transition: transform 0.3s;
-            }
-            .file-card:hover {
-                transform: translateY(-5px);
-            }
-            .error-card {
-                background: #fff3cd;
-                border-left: 4px solid #ffc107;
-            }
-            .stats-badge {
-                background: #667eea;
-                color: white;
-                padding: 5px 10px;
-                border-radius: 20px;
-                font-size: 12px;
-                display: inline-block;
-                margin: 2px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1>📁 Проверка собранных данных</h1>
-                <a href="/" class="btn btn-primary">← На главную</a>
-            </div>
-    """
-    
-    if not csv_files:
-        html += """
-        <div class="alert alert-danger">
-            <h4>❌ Данные не найдены!</h4>
-            <p>Запустите сбор данных:</p>
-            <pre>python src/vk_collector.py</pre>
-        </div>
-        """
-    else:
-        # Группируем файлы по темам
-        files_by_topic = {}
-        for file in csv_files:
+    for file in vk_csv_files:
+        try:
+            df = pd.read_csv(file, encoding='utf-8-sig', sep=';')
             filename = os.path.basename(file)
-            # Извлекаем тему из имени файла (убираем vk_ и .csv)
-            if filename.startswith('vk_'):
-                topic = filename.replace('vk_', '').replace('.csv', '')
+            topic = filename.replace('vk_', '').replace('.csv', '')
+            display_name = topic_names_vk.get(topic, topic)
+            
+            text_preview = ""
+            if 'text' in df.columns and len(df) > 0:
+                first_text = df['text'].iloc[0]
+                if pd.notna(first_text) and str(first_text).strip():
+                    text_preview = str(first_text)[:200] + "..."
+                else:
+                    text_preview = "(Пост без текста)"
             else:
-                topic = filename.replace('.csv', '')
+                text_preview = "(Нет текста в данных)"
             
-            if topic not in files_by_topic:
-                files_by_topic[topic] = []
-            files_by_topic[topic].append(file)
-        
-        html += f'<p class="text-muted mb-4">📊 Найдено тем: {len(files_by_topic)}</p>'
-        
-        # Отображаем каждую тему
-        for topic, files in files_by_topic.items():
-            # Красивое название темы
-            display_name = topic_names.get(topic, f'📌 {topic.capitalize()} (ВК)')
-            
-            html += f"""
-            <div class="file-card">
-                <h3>{display_name}</h3>
-                <hr>
-            """
-            
-            for file in files:
-                try:
-                    df = pd.read_csv(file, encoding='utf-8-sig', sep=';')
-                    filename = os.path.basename(file)
-                    
-                    # Статистика по теме
-                    total_posts = len(df)
-                    avg_likes = df['likes'].mean() if 'likes' in df.columns else 0
-                    max_likes = df['likes'].max() if 'likes' in df.columns else 0
-                    total_views = df['views'].sum() if 'views' in df.columns else 0
-                    
-                    # Безопасное получение текста
-                    text_preview = ""
-                    if 'text' in df.columns and len(df) > 0:
-                        first_text = df['text'].iloc[0]
-                        if pd.notna(first_text) and str(first_text).strip():
-                            text_preview = str(first_text)[:200]
-                        else:
-                            text_preview = "(Пост без текста)"
-                    else:
-                        text_preview = "(Нет текста в данных)"
-                    
-                    html += f"""
-                    <div class="row">
-                        <div class="col-md-12">
-                            <div class="mb-3">
-                                <span class="stats-badge">📝 Постов: {total_posts}</span>
-                                <span class="stats-badge">❤️ Средний лайк: {avg_likes:.1f}</span>
-                                <span class="stats-badge">⭐ Макс. лайк: {max_likes}</span>
-                                <span class="stats-badge">👁️ Всего просмотров: {total_views:,}</span>
-                            </div>
-                            <p><strong>📄 Пример поста:</strong></p>
-                            <div class="alert alert-secondary">
-                                <small>{text_preview}...</small>
-                            </div>
-                            <small class="text-muted">📁 Файл: {filename}</small>
-                        </div>
-                    </div>
-                    """
-                except Exception as e:
-                    html += f"""
-                    <div class="alert alert-warning">
-                        <strong>⚠️ Ошибка чтения файла:</strong> {str(e)}
-                    </div>
-                    """
-            
-            html += "</div>"
+            vk_files.append({
+                'name': filename,
+                'display_name': display_name,
+                'preview': text_preview,
+                'stats': {
+                    'rows': len(df),
+                    'avg_likes': round(df['likes'].mean(), 1) if 'likes' in df.columns else None,
+                    'max_likes': df['likes'].max() if 'likes' in df.columns else None,
+                    'total_views': int(df['views'].sum()) if 'views' in df.columns else None
+                }
+            })
+        except Exception as e:
+            print(f"Ошибка VK {file}: {e}")
     
-    html += """
-        </div>
-    </body>
-    </html>
-    """
-    return html
+    return render_template('check.html', vk_files=vk_files)
 
-@app.route('/forecast')
-def forecast_page():
-    """Страница с ML прогнозами"""
-    forecast = MLForecast()
-    predictions = forecast.forecast_all_topics()
-    
-    return render_template('forecast.html', predictions=predictions)
 
-@app.route('/dashboard')
-def dashboard():
-    """Дашборд с визуализацией"""
-    
-    import os
-    import glob
+@app.route('/check/vk')
+def check_vk():
+    """Проверка данных VK"""
     import pandas as pd
+    import glob
+    import os
     
-    # Загружаем все CSV файлы
     csv_files = glob.glob("data/vk_*.csv")
+    files = []
     
-    if not csv_files:
-        return render_template('dashboard.html', graphs={}, data=[])
+    topic_names = {
+        'животные': '🐾 Животные',
+        'игры': '🎮 Игры',
+        'новости': '📰 Новости',
+        'творчество': '🎨 Творчество'
+    }
     
-    # Собираем статистику
-    data = []
     for file in csv_files:
         try:
             df = pd.read_csv(file, encoding='utf-8-sig', sep=';')
             filename = os.path.basename(file)
             topic = filename.replace('vk_', '').replace('.csv', '')
-            
-            topic_names = {
-                'животные': 'Животные',
-                'игры': 'Игры',
-                'новости': 'Новости',
-                'творчество': 'Творчество'
-            }
             display_name = topic_names.get(topic, topic)
             
-            stats = {
+            text_preview = ""
+            if 'text' in df.columns and len(df) > 0:
+                first_text = df['text'].iloc[0]
+                if pd.notna(first_text) and str(first_text).strip():
+                    text_preview = str(first_text)[:200] + "..."
+                else:
+                    text_preview = "(Пост без текста)"
+            else:
+                text_preview = "(Нет текста в данных)"
+            
+            files.append({
+                'name': filename,
+                'display_name': display_name,
+                'preview': text_preview,
+                'stats': {
+                    'rows': len(df),
+                    'avg_likes': round(df['likes'].mean(), 1) if 'likes' in df.columns else None,
+                    'max_likes': df['likes'].max() if 'likes' in df.columns else None,
+                    'total_views': int(df['views'].sum()) if 'views' in df.columns else None
+                }
+            })
+        except Exception as e:
+            print(f"Ошибка {file}: {e}")
+    
+    return render_template('check_vk.html', files=files)
+
+
+@app.route('/check/habr')
+def check_habr():
+    """Проверка данных Habr"""
+    import pandas as pd
+    import glob
+    import os
+    
+    csv_files = glob.glob("data/habr_*.csv")
+    files = []
+    
+    topic_names = {
+        'программирование': '💻 Программирование',
+        'игры': '🎮 Игры',
+        'it_новости': '📰 IT-новости'
+    }
+    
+    for file in csv_files:
+        try:
+            df = pd.read_csv(file, encoding='utf-8-sig', sep=';')
+            filename = os.path.basename(file)
+            topic = filename.replace('habr_', '').replace('.csv', '')
+            display_name = topic_names.get(topic, topic)
+            
+            title_preview = ""
+            if 'title' in df.columns and len(df) > 0:
+                first_title = df['title'].iloc[0]
+                if pd.notna(first_title) and str(first_title).strip():
+                    title_preview = str(first_title)[:200] + "..."
+                else:
+                    title_preview = "(Нет заголовка)"
+            else:
+                title_preview = "(Нет данных)"
+            
+            files.append({
+                'name': filename,
+                'display_name': display_name,
+                'preview': title_preview,
+                'stats': {
+                    'rows': len(df),
+                    'total_authors': df['author'].nunique() if 'author' in df.columns else None,
+                    'total_hubs': df['hub'].nunique() if 'hub' in df.columns else None
+                }
+            })
+        except Exception as e:
+            print(f"Ошибка {file}: {e}")
+    
+    return render_template('check_habr.html', files=files)
+
+@app.route('/dashboard/vk')
+def dashboard_vk():
+    """Дашборд для VK данных"""
+    import pandas as pd
+    import glob
+    import os
+    
+    csv_files = glob.glob("data/vk_*.csv")
+    data = []
+    
+    topic_names = {
+        'животные': '🐾 Животные',
+        'игры': '🎮 Игры',
+        'новости': '📰 Новости',
+        'творчество': '🎨 Творчество'
+    }
+    
+    for file in csv_files:
+        try:
+            df = pd.read_csv(file, encoding='utf-8-sig', sep=';')
+            filename = os.path.basename(file)
+            topic = filename.replace('vk_', '').replace('.csv', '')
+            display_name = topic_names.get(topic, topic)
+            
+            data.append({
                 'Тема': display_name,
                 'Посты': len(df),
                 'Лайки': float(df['likes'].mean()) if 'likes' in df.columns else 0,
                 'Репосты': float(df['reposts'].mean()) if 'reposts' in df.columns else 0,
                 'Комментарии': float(df['comments'].mean()) if 'comments' in df.columns else 0,
                 'Всего_лайков': int(df['likes'].sum()) if 'likes' in df.columns else 0
-            }
-            data.append(stats)
+            })
         except Exception as e:
-            print(f"Ошибка: {e}")
+            print(f"Ошибка VK {file}: {e}")
     
-    return render_template('dashboard.html', data=data)
+    return render_template('dashboard_vk.html', data=data, source='VK')
+
+
+@app.route('/forecast/vk')
+def forecast_vk():
+    """Страница прогнозов для VK"""
+    from forecast_ml import MLForecast
+    
+    forecast = MLForecast()
+    predictions = forecast.forecast_all_topics()
+    
+    return render_template('forecast_vk.html', predictions=predictions, source='VK')
+
+@app.route('/dashboard/habr')
+def dashboard_habr():
+    """Дашборд для Habr данных"""
+    import pandas as pd
+    import glob
+    import os
+    
+    csv_files = glob.glob("data/habr_*.csv")
+    data = []
+    
+    # Соответствие тем красивым названиям
+    topic_names = {
+        'программирование': '💻 Программирование',
+        'игры': '🎮 Игры',
+        'it_новости': '📰 IT-новости'
+    }
+    
+    for file in csv_files:
+        try:
+            df = pd.read_csv(file, encoding='utf-8-sig', sep=';')
+            filename = os.path.basename(file)
+            topic = filename.replace('habr_', '').replace('.csv', '')
+            display_name = topic_names.get(topic, topic)
+            
+            # Анализируем частоту слов для облака тегов
+            all_text = ' '.join(df['title'].fillna('') + ' ' + df['text'].fillna(''))
+            
+            data.append({
+                'Тема': display_name,
+                'Посты': len(df),
+                'Авторов': df['author'].nunique(),
+                'Хабов': df['hub'].nunique(),
+                'Средняя_длина_заголовка': round(df['title'].str.len().mean(), 1),
+                'Самый_активный_автор': df['author'].mode().iloc[0] if not df['author'].mode().empty else '—',
+                'Популярный_хаб': df['hub'].mode().iloc[0] if not df['hub'].mode().empty else '—'
+            })
+        except Exception as e:
+            print(f"Ошибка {file}: {e}")
+    
+    return render_template('dashboard_habr.html', data=data, source='Habr')
+
+@app.route('/forecast/habr')
+def forecast_habr():
+    """Страница прогнозов для Habr"""
+    from habr_analyzer import HabrAnalyzer
+    
+    analyzer = HabrAnalyzer()
+    results = analyzer.analyze_all_topics()
+    
+    return render_template('forecast_habr.html', predictions=results, source='Habr')
+
+@app.route('/collect/habr')
+def collect_habr():
+    """Страница сбора данных из Habr"""
+    return render_template('collect_habr.html')
+    
+@app.route('/run_collect/habr')
+def run_collect_habr():
+    """Запуск сбора данных из Habr"""
+    import subprocess
+    import sys
+    import os
+    
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        collector_path = os.path.join(base_dir, 'src', 'habr_collector.py')
+        
+        result = subprocess.run(
+            [sys.executable, collector_path],
+            capture_output=True,
+            text=True,
+            timeout=180
+        )
+        
+        if result.returncode == 0:
+            return render_template('collect_result_habr.html', success=True)
+        else:
+            return render_template('collect_result_habr.html',
+                                 success=False,
+                                 error=result.stderr if result.stderr else "Неизвестная ошибка")
+    except subprocess.TimeoutExpired:
+        return render_template('collect_result_habr.html',
+                             success=False,
+                             error="Превышено время ожидания (3 минуты)")
+    except Exception as e:
+        return render_template('collect_result_habr.html',
+                             success=False,
+                             error=str(e))
+
+@app.route('/forecast')
+def forecast_page():
+    """Страница прогнозов VK"""
+    from forecast_ml import MLForecast
+    
+    forecast = MLForecast()
+    predictions = forecast.forecast_all_topics()
+    
+    return render_template('forecast.html', predictions=predictions)
+
+# @app.route('/dashboard')
+# def dashboard():
+#     """Дашборд с визуализацией"""
+    
+#     import os
+#     import glob
+#     import pandas as pd
+    
+#     # Загружаем все CSV файлы
+#     csv_files = glob.glob("data/vk_*.csv")
+    
+#     if not csv_files:
+#         return render_template('dashboard.html', graphs={}, data=[])
+    
+#     # Собираем статистику
+#     data = []
+#     for file in csv_files:
+#         try:
+#             df = pd.read_csv(file, encoding='utf-8-sig', sep=';')
+#             filename = os.path.basename(file)
+#             topic = filename.replace('vk_', '').replace('.csv', '')
+            
+#             topic_names = {
+#                 'животные': 'Животные',
+#                 'игры': 'Игры',
+#                 'новости': 'Новости',
+#                 'творчество': 'Творчество'
+#             }
+#             display_name = topic_names.get(topic, topic)
+            
+#             stats = {
+#                 'Тема': display_name,
+#                 'Посты': len(df),
+#                 'Лайки': float(df['likes'].mean()) if 'likes' in df.columns else 0,
+#                 'Репосты': float(df['reposts'].mean()) if 'reposts' in df.columns else 0,
+#                 'Комментарии': float(df['comments'].mean()) if 'comments' in df.columns else 0,
+#                 'Всего_лайков': int(df['likes'].sum()) if 'likes' in df.columns else 0
+#             }
+#             data.append(stats)
+#         except Exception as e:
+#             print(f"Ошибка: {e}")
+    
+#     return render_template('dashboard.html', data=data)
 
 @app.route('/collect', methods=['GET', 'POST'])
 def collect_data():
-    """Страница сбора данных с формой"""
-    
+    """Страница сбора данных VK"""
     if request.method == 'POST':
         import subprocess
         import sys
@@ -315,18 +376,17 @@ def collect_data():
             )
             
             if result.returncode == 0:
-                # Успех - не показываем лог, просто красивую страницу
-                return render_template('collect_result.html', success=True)
+                return render_template('collect_result_vk.html', success=True)
             else:
-                return render_template('collect_result.html',
+                return render_template('collect_result_vk.html',
                                      success=False,
                                      error=result.stderr if result.stderr else "Неизвестная ошибка")
         except subprocess.TimeoutExpired:
-            return render_template('collect_result.html',
+            return render_template('collect_result_vk.html',
                                  success=False,
                                  error="Превышено время ожидания (3 минуты)")
         except Exception as e:
-            return render_template('collect_result.html',
+            return render_template('collect_result_vk.html',
                                  success=False,
                                  error=str(e))
     
@@ -339,9 +399,6 @@ if __name__ == '__main__':
     print("🚀 ПЛАТФОРМА АНАЛИЗА ТРЕНДОВ ЗАПУЩЕНА")
     print("=" * 50)
     print("📍 Главная страница: http://localhost:5000")
-    print("📍 Проверка данных: http://localhost:5000/check")
-    print("📍 Дашборд: http://localhost:5000/dashboard")
-    print("📍 Сбор данных: http://localhost:5000/collect")
     print("=" * 50)
     print("Нажмите Ctrl+C для остановки")
     

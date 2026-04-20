@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Дашборд VK</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        body { background: #f8f9fa; padding: 20px; }
+        .stats-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px; padding: 25px; margin-bottom: 25px; }
+        .metric-box { background: white; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .metric-box h3 { margin: 0; font-size: 2rem; color: #667eea; }
+        .metric-box p { margin: 0; color: #6c757d; }
+        .chart-container { background: white; border-radius: 15px; padding: 20px; margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-custom { background: white; color: #667eea; border: none; padding: 10px 25px; border-radius: 25px; margin: 0 5px; text-decoration: none; display: inline-block; }
+        .nav-tabs .nav-link.active { background-color: #667eea; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1>📱 Дашборд ВКонтакте</h1>
+                    <p>Статистика постов из групп ВК</p>
+                </div>
+                <div>
+                    <a href="/" class="btn-custom">🏠 Главная</a>
+                    <a href="/collect" class="btn-custom">🔄 Сбор данных</a>
+                </div>
+            </div>
+        </div>
+        
+        
+        {% if data and data|length > 0 %}
+        <!-- Метрики -->
+        <div class="row mb-4">
+            <div class="col-md-4"><div class="metric-box"><p>Всего тем</p><h3>{{ data|length }}</h3></div></div>
+            <div class="col-md-4"><div class="metric-box"><p>Всего постов</p><h3>{{ data|sum(attribute='Посты') }}</h3></div></div>
+            <div class="col-md-4"><div class="metric-box"><p>Всего лайков</p><h3>{{ data|sum(attribute='Всего_лайков') }}</h3></div></div>
+        </div>
+        
+        <!-- Графики: посты и лайки -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h5>📊 Количество постов по темам</h5>
+                    <canvas id="postsChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h5>❤️ Среднее количество лайков</h5>
+                    <canvas id="likesChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Круговая диаграмма (уменьшенная, по центру) -->
+        <div class="row">
+            <div class="col-md-6 mx-auto">
+                <div class="chart-container" style="max-width: 450px; margin: 0 auto;">
+                    <h5 class="text-center">📈 Распределение постов по темам</h5>
+                    <canvas id="pieChart" style="max-height: 280px;"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Таблица -->
+        <div class="chart-container">
+            <h5>📋 Детальная статистика</h5>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr><th>Тема</th><th>Посты</th><th>Лайки (сред.)</th><th>Репосты</th><th>Комментарии</th><th>Всего лайков</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for row in data %}
+                        <tr>
+                            <td><b>{{ row.Тема }}</b></td>
+                            <td>{{ row.Посты }}</td>
+                            <td>{{ "%.1f"|format(row.Лайки) }}</td>
+                            <td>{{ "%.1f"|format(row.Репосты) }}</td>
+                            <td>{{ "%.1f"|format(row.Комментарии) }}</td>
+                            <td>{{ row.Всего_лайков }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <script>
+            const topics = [{% for row in data %}"{{ row.Тема }}",{% endfor %}];
+            const posts = [{% for row in data %}{{ row.Посты }},{% endfor %}];
+            const likes = [{% for row in data %}{{ row.Лайки }},{% endfor %}];
+            const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe'];
+            
+            new Chart(document.getElementById('postsChart'), { 
+                type: 'bar', 
+                data: { labels: topics, datasets: [{ label: 'Посты', data: posts, backgroundColor: colors, borderRadius: 10 }] },
+                options: { responsive: true, maintainAspectRatio: true }
+            });
+            
+            new Chart(document.getElementById('likesChart'), { 
+                type: 'bar', 
+                data: { labels: topics, datasets: [{ label: 'Лайки', data: likes, backgroundColor: colors, borderRadius: 10 }] },
+                options: { responsive: true, maintainAspectRatio: true }
+            });
+            
+            new Chart(document.getElementById('pieChart'), { 
+                type: 'pie', 
+                data: { labels: topics, datasets: [{ data: posts, backgroundColor: colors }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'right' } } }
+            });
+        </script>
+        
+        {% else %}
+        <div class="alert alert-info text-center"><h4>📭 Нет данных VK</h4><a href="/collect" class="btn btn-primary">Собрать данные</a></div>
+        {% endif %}
+    </div>
+</body>
+</html>

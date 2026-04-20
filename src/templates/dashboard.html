@@ -5,14 +5,26 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
-        body { background: #f8f9fa; padding: 20px; }
-        .stats-card {
+        body { background: #f8f9fa; padding: 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* Стили для VK (фиолетовая тема) */
+        .stats-card-vk {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border-radius: 15px;
             padding: 25px;
             margin-bottom: 25px;
         }
+        
+        /* Стили для Habr (тёмная тема) */
+        .stats-card-habr {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
         .metric-box {
             background: white;
             border-radius: 10px;
@@ -20,9 +32,12 @@
             text-align: center;
             margin-bottom: 15px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
         }
+        .metric-box:hover { transform: translateY(-5px); }
         .metric-box h3 { margin: 0; font-size: 2rem; color: #667eea; }
-        .metric-box p { margin: 0; color: #6c757d; }
+        .metric-box p { margin: 0; color: #6c757d; font-weight: 600; }
+        
         .chart-container {
             background: white;
             border-radius: 15px;
@@ -30,14 +45,7 @@
             margin-bottom: 25px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .chart-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 15px;
-            color: #333;
-            border-left: 4px solid #667eea;
-            padding-left: 12px;
-        }
+        
         .btn-custom {
             background: white;
             color: #667eea;
@@ -47,223 +55,297 @@
             margin: 0 5px;
             text-decoration: none;
             display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s;
         }
+        .btn-custom:hover {
+            background: #f0f0f0;
+            transform: scale(1.05);
+        }
+        
         .table-container {
             background: white;
             border-radius: 15px;
             padding: 25px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .table thead th { background: #667eea; color: white; }
-        canvas { max-height: 400px; width: 100%; }
+        .table thead th { background: #667eea; color: white; border: none; }
+        
+        /* Вкладки */
+        .nav-tabs { margin-bottom: 20px; border-bottom: 2px solid #e0e0e0; }
+        .nav-tabs .nav-link { 
+            font-weight: 600; 
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px 10px 0 0;
+            transition: all 0.3s;
+        }
+        .nav-tabs .nav-link.active { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .nav-tabs .nav-link:not(.active):hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+        
+        /* Badge для разных источников */
+        .badge-vk { background: #667eea; color: white; padding: 5px 10px; border-radius: 20px; font-size: 12px; }
+        .badge-habr { background: #1a1a2e; color: white; padding: 5px 10px; border-radius: 20px; font-size: 12px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="stats-card">
+        <!-- Шапка с вкладками -->
+        <div class="stats-card-vk" id="headerVK">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h1>📊 Платформа анализа трендов</h1>
-                    <p>Статистика из VK по собранным данным</p>
+                    <p class="lead">Анализ социальных медиа и IT-платформ</p>
                 </div>
                 <div>
                     <a href="/" class="btn-custom">🏠 Главная</a>
                     <a href="/check" class="btn-custom">📁 Проверка данных</a>
-                    <a href="/collect" class="btn-custom">🔄 Сбор данных</a>
                 </div>
             </div>
         </div>
         
-        {% if data and data|length > 0 %}
-        <!-- Метрики (убрана активность) -->
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="metric-box">
-                    <p>Всего тем</p>
-                    <h3>{{ data|length }}</h3>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="metric-box">
-                    <p>Всего постов</p>
-                    <h3>{{ data|sum(attribute='Посты') }}</h3>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="metric-box">
-                    <p>Всего лайков</p>
-                    <h3>{{ data|sum(attribute='Всего_лайков') }}</h3>
-                </div>
-            </div>
-        </div>
+        <!-- Вкладки переключения -->
+        <ul class="nav nav-tabs" id="sourceTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="vk-tab" data-bs-toggle="tab" data-bs-target="#vk-content" type="button" role="tab">
+                    📱 ВКонтакте
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="habr-tab" data-bs-toggle="tab" data-bs-target="#habr-content" type="button" role="tab">
+                    📝 Habr
+                </button>
+            </li>
+        </ul>
         
-        <!-- Графики -->
-        <div class="row">
-            <div class="col-md-6">
-                <div class="chart-container">
-                    <div class="chart-title">📊 Количество постов по темам</div>
-                    <canvas id="postsChart"></canvas>
+        <!-- Контент вкладок -->
+        <div class="tab-content" id="sourceTabsContent">
+            
+            <!-- ==================== ВКЛАДКА VK ==================== -->
+            <div class="tab-pane fade show active" id="vk-content" role="tabpanel">
+                {% if vk_data and vk_data|length > 0 %}
+                <!-- Метрики VK -->
+                <div class="row mb-4 mt-4">
+                    <div class="col-md-4">
+                        <div class="metric-box">
+                            <p>Всего тем</p>
+                            <h3>{{ vk_data|length }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="metric-box">
+                            <p>Всего постов</p>
+                            <h3>{{ vk_data|sum(attribute='Посты') }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="metric-box">
+                            <p>Всего лайков</p>
+                            <h3>{{ vk_data|sum(attribute='Всего_лайков') }}</h3>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <div class="chart-container">
-                    <div class="chart-title">❤️ Среднее количество лайков</div>
-                    <canvas id="likesChart"></canvas>
+                
+                <!-- Графики VK -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5>📊 Количество постов по темам</h5>
+                            <canvas id="vkPostsChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5>❤️ Среднее количество лайков</h5>
+                            <canvas id="vkLikesChart"></canvas>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-12">
-                <div class="chart-container">
-                    <div class="chart-title">📈 Распределение постов по темам</div>
-                    <canvas id="pieChart" style="max-height: 400px;"></canvas>
+                
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="chart-container">
+                            <h5>📈 Распределение постов по темам</h5>
+                            <canvas id="vkPieChart"></canvas>
+                        </div>
+                    </div>
                 </div>
+                
+                <!-- Таблица VK -->
+                <div class="table-container">
+                    <h5>📋 Детальная статистика VK</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr><th>Тема</th><th>Посты</th><th>Лайки (сред.)</th><th>Репосты</th><th>Комментарии</th><th>Всего лайков</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for row in vk_data %}
+                                <tr>
+                                    <td><strong>{{ row.Тема }}</strong></td>
+                                    <td>{{ row.Посты }}</td>
+                                    <td>{{ "%.1f"|format(row.Лайки) }}</td>
+                                    <td>{{ "%.1f"|format(row.Репосты) }}</td>
+                                    <td>{{ "%.1f"|format(row.Комментарии) }}</td>
+                                    <td>{{ row.Всего_лайков }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <script>
+                    // Данные VK
+                    const vkTopics = [{% for row in vk_data %}"{{ row.Тема }}",{% endfor %}];
+                    const vkPosts = [{% for row in vk_data %}{{ row.Посты }},{% endfor %}];
+                    const vkLikes = [{% for row in vk_data %}{{ row.Лайки }},{% endfor %}];
+                    const vkColors = ['#667eea', '#764ba2', '#f093fb', '#4facfe'];
+                    
+                    // График постов VK
+                    new Chart(document.getElementById('vkPostsChart'), {
+                        type: 'bar',
+                        data: { labels: vkTopics, datasets: [{ label: 'Посты', data: vkPosts, backgroundColor: vkColors, borderRadius: 10 }] }
+                    });
+                    
+                    // График лайков VK
+                    new Chart(document.getElementById('vkLikesChart'), {
+                        type: 'bar',
+                        data: { labels: vkTopics, datasets: [{ label: 'Лайки', data: vkLikes, backgroundColor: vkColors, borderRadius: 10 }] }
+                    });
+                    
+                    // Круговая диаграмма VK
+                    new Chart(document.getElementById('vkPieChart'), {
+                        type: 'pie',
+                        data: { labels: vkTopics, datasets: [{ data: vkPosts, backgroundColor: vkColors }] }
+                    });
+                </script>
+                
+                {% else %}
+                <div class="alert alert-info text-center mt-4">
+                    <h4>📭 Нет данных из VK</h4>
+                    <p>Сначала соберите данные через раздел <a href="/collect">"Сбор данных"</a></p>
+                </div>
+                {% endif %}
             </div>
-        </div>
-        
-        <!-- Таблица -->
-        <div class="table-container">
-            <h3>📋 Детальная статистика</h3>
-            <div class="table-responsive">
-                <table class="table table-striped">
-                    <thead>
-                        <tr><th>Тема</th><th>Посты</th><th>Лайки (сред.)</th><th>Всего лайков</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for row in data %}
-                        <tr>
-                            <td><b>{{ row.Тема }}</b></td>
-                            <td>{{ row.Посты }}</td>
-                            <td>{{ "%.0f"|format(row.Лайки) }}</td>
-                            <td>{{ row.Всего_лайков }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            
+            <!-- ==================== ВКЛАДКА HABR ==================== -->
+            <div class="tab-pane fade" id="habr-content" role="tabpanel">
+                {% if habr_data and habr_data|length > 0 %}
+                <!-- Метрики Habr -->
+                <div class="row mb-4 mt-4">
+                    <div class="col-md-4">
+                        <div class="metric-box">
+                            <p>Всего тем</p>
+                            <h3>{{ habr_data|length }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="metric-box">
+                            <p>Всего статей</p>
+                            <h3>{{ habr_data|sum(attribute='Посты') }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="metric-box">
+                            <p>Всего авторов</p>
+                            <h3>{{ habr_data|sum(attribute='Авторов') }}</h3>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Графики Habr -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5>📊 Количество статей по темам</h5>
+                            <canvas id="habrPostsChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5>👥 Активность авторов по темам</h5>
+                            <canvas id="habrAuthorsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="chart-container">
+                            <h5>📈 Распределение статей по темам</h5>
+                            <canvas id="habrPieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Таблица Habr -->
+                <div class="table-container">
+                    <h5>📋 Детальная статистика Habr</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr><th>Тема</th><th>Статьи</th><th>Авторов</th><th>Хабов</th><th>Ср. длина заголовка</th><th>Активный автор</th><th>Популярный хаб</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for row in habr_data %}
+                                <tr>
+                                    <td><strong>{{ row.Тема }}</strong></td>
+                                    <td>{{ row.Посты }}</td>
+                                    <td>{{ row.Авторов }}</td>
+                                    <td>{{ row.Хабов }}</td>
+                                    <td>{{ row.Средняя_длина_заголовка }}</td>
+                                    <td>{{ row.Самый_активный_автор }} \n                                    <td>{{ row.Популярный_хаб }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <script>
+                    // Данные Habr
+                    const habrTopics = [{% for row in habr_data %}"{{ row.Тема }}",{% endfor %}];
+                    const habrPosts = [{% for row in habr_data %}{{ row.Посты }},{% endfor %}];
+                    const habrAuthors = [{% for row in habr_data %}{{ row.Авторов }},{% endfor %}];
+                    const habrColors = ['#1a1a2e', '#16213e', '#0f3460', '#533483'];
+                    
+                    // График статей Habr
+                    new Chart(document.getElementById('habrPostsChart'), {
+                        type: 'bar',
+                        data: { labels: habrTopics, datasets: [{ label: 'Статьи', data: habrPosts, backgroundColor: habrColors, borderRadius: 10 }] }
+                    });
+                    
+                    // График авторов Habr
+                    new Chart(document.getElementById('habrAuthorsChart'), {
+                        type: 'bar',
+                        data: { labels: habrTopics, datasets: [{ label: 'Авторы', data: habrAuthors, backgroundColor: '#e74c3c', borderRadius: 10 }] }
+                    });
+                    
+                    // Круговая диаграмма Habr
+                    new Chart(document.getElementById('habrPieChart'), {
+                        type: 'pie',
+                        data: { labels: habrTopics, datasets: [{ data: habrPosts, backgroundColor: habrColors }] }
+                    });
+                </script>
+                
+                {% else %}
+                <div class="alert alert-info text-center mt-4">
+                    <h4>📭 Нет данных из Habr</h4>
+                    <p>Сначала соберите данные через раздел <a href="/collect/habr">"Сбор данных Habr"</a></p>
+                </div>
+                {% endif %}
             </div>
+            
         </div>
-        
-        <script>
-            // Данные из Flask
-            const topics = [{% for row in data %}"{{ row.Тема }}",{% endfor %}];
-            const posts = [{% for row in data %}{{ row.Посты }},{% endfor %}];
-            const likes = [{% for row in data %}{{ row.Лайки }},{% endfor %}];
-            
-            // Округляем лайки для отображения (но в тултипе покажем целые)
-            const likesRounded = likes.map(l => Math.round(l));
-            
-            console.log('Темы:', topics);
-            console.log('Посты:', posts);
-            console.log('Лайки (округлённые):', likesRounded);
-            
-            // Цвета
-            const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe'];
-            
-            // 1. График постов
-            new Chart(document.getElementById('postsChart'), {
-                type: 'bar',
-                data: {
-                    labels: topics,
-                    datasets: [{
-                        label: 'Количество постов',
-                        data: posts,
-                        backgroundColor: colors,
-                        borderRadius: 10,
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.raw + ' постов';
-                                }
-                            }
-                        },
-                        legend: { position: 'top' }
-                    }
-                }
-            });
-            
-            // 2. График лайков (с целыми числами при наведении)
-            new Chart(document.getElementById('likesChart'), {
-                type: 'bar',
-                data: {
-                    labels: topics,
-                    datasets: [{
-                        label: 'Среднее количество лайков',
-                        data: likes,
-                        backgroundColor: colors,
-                        borderRadius: 10,
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    // Показываем целое число без остатка
-                                    return Math.round(context.raw) + ' лайков';
-                                }
-                            }
-                        },
-                        legend: { position: 'top' }
-                    },
-                    scales: {
-                        y: {
-                            ticks: {
-                                callback: function(value) {
-                                    return Math.round(value);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-            
-            // 3. Круговая диаграмма
-            new Chart(document.getElementById('pieChart'), {
-                type: 'pie',
-                data: {
-                    labels: topics,
-                    datasets: [{
-                        data: posts,
-                        backgroundColor: colors,
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const total = posts.reduce((a, b) => a + b, 0);
-                                    const percent = ((context.raw / total) * 100).toFixed(1);
-                                    return `${context.label}: ${context.raw} постов (${percent}%)`;
-                                }
-                            }
-                        },
-                        legend: { position: 'right' }
-                    }
-                }
-            });
-        </script>
-        
-        {% else %}
-        <div class="alert alert-info text-center">
-            <h2>📭 Нет данных</h2>
-            <a href="/collect" class="btn btn-primary">Собрать данные</a>
-        </div>
-        {% endif %}
     </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

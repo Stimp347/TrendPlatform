@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Дашборд Habr</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        body { background: #f8f9fa; padding: 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .metric-box {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+        .metric-box:hover {
+            transform: translateY(-5px);
+        }
+        .metric-box h3 {
+            margin: 0;
+            font-size: 2rem;
+            color: #1a1a2e;
+        }
+        .metric-box p {
+            margin: 0;
+            color: #6c757d;
+            font-weight: 600;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn-custom {
+            background: white;
+            color: #1a1a2e;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            margin: 0 5px;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-custom:hover {
+            background: #f0f0f0;
+            transform: scale(1.05);
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .table thead th {
+            background: #1a1a2e;
+            color: white;
+            border: none;
+        }
+        
+        .badge-habr {
+            background: #1a1a2e;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        
+        .pie-container {
+            max-width: 450px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1>📝 Дашборд Habr</h1>
+                    <p>Анализ статей, авторов и хабов</p>
+                </div>
+                <div>
+                    <a href="/" class="btn-custom">🏠 Главная</a>
+                    <a href="/collect/habr" class="btn-custom">🔄 Сбор данных</a>
+                </div>
+            </div>
+        </div>
+        
+        {% if data and data|length > 0 %}
+        <!-- Метрики -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="metric-box">
+                    <p>Всего тем</p>
+                    <h3>{{ data|length }}</h3>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-box">
+                    <p>Всего статей</p>
+                    <h3>{{ data|sum(attribute='Посты') }}</h3>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-box">
+                    <p>Всего авторов</p>
+                    <h3>{{ data|sum(attribute='Авторов') }}</h3>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Графики -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h5>📊 Количество статей по темам</h5>
+                    <canvas id="postsChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h5>👥 Активность авторов по темам</h5>
+                    <canvas id="authorsChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Круговая диаграмма (по количеству статей) -->
+        <div class="row">
+            <div class="col-md-6 mx-auto">
+                <div class="chart-container pie-container">
+                    <h5 class="text-center">📈 Распределение статей по темам</h5>
+                    <canvas id="pieChart" style="max-height: 280px;"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Таблица -->
+        <div class="table-container">
+            <h5>📋 Детальная статистика по темам</h5>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Тема</th>
+                            <th>Статьи</th>
+                            <th>Авторов</th>
+                            <th>Хабов</th>
+                            <th>Ср. длина заголовка</th>
+                            <th>Активный автор</th>
+                            <th>Популярный хаб</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in data %}
+                        <tr>
+                            <td><strong>{{ row.Тема }}</strong></td>
+                            <td>{{ row.Посты }}</td>
+                            <td>{{ row.Авторов }}</td>
+                            <td>{{ row.Хабов }}</td>
+                            <td>{{ row.Средняя_длина_заголовка }}</td>
+                            <td>{{ row.Самый_активный_автор }}</td>
+                            <td>{{ row.Популярный_хаб }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <script>
+            const topics = [{% for row in data %}"{{ row.Тема }}",{% endfor %}];
+            const posts = [{% for row in data %}{{ row.Посты }},{% endfor %}];
+            const authors = [{% for row in data %}{{ row.Авторов }},{% endfor %}];
+            const colors = ['#1a1a2e', '#16213e', '#0f3460', '#533483'];
+            
+            // График статей
+            new Chart(document.getElementById('postsChart'), {
+                type: 'bar',
+                data: {
+                    labels: topics,
+                    datasets: [{
+                        label: 'Статьи',
+                        data: posts,
+                        backgroundColor: colors,
+                        borderRadius: 10,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+            
+            // График авторов
+            new Chart(document.getElementById('authorsChart'), {
+                type: 'bar',
+                data: {
+                    labels: topics,
+                    datasets: [{
+                        label: 'Авторы',
+                        data: authors,
+                        backgroundColor: '#e74c3c',
+                        borderRadius: 10,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+            
+            // Круговая диаграмма (по количеству статей)
+            new Chart(document.getElementById('pieChart'), {
+                type: 'pie',
+                data: {
+                    labels: topics,
+                    datasets: [{
+                        data: posts,
+                        backgroundColor: colors,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'right' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = posts.reduce((a, b) => a + b, 0);
+                                    const percent = ((context.raw / total) * 100).toFixed(1);
+                                    return `${context.label}: ${context.raw} статей (${percent}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        </script>
+        
+        {% else %}
+        <div class="alert alert-info text-center">
+            <h4>📭 Нет данных Habr</h4>
+            <p>Сначала соберите данные через раздел <a href="/collect/habr" class="btn btn-primary">Сбор данных Habr</a></p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
